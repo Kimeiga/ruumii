@@ -1,59 +1,182 @@
 <script>
-	import Counter from './Counter.svelte';
-	import welcome from '$lib/images/svelte-welcome.webp';
-	import welcome_fallback from '$lib/images/svelte-welcome.png';
+	// @ts-nocheck
+
+	// import { FirebaseApp, User, Doc, Collection } from 'sveltefire';
+
+	// // import firebase from 'firebase/app';
+	// // import 'firebase/firestore';
+	// // import 'firebase/auth';
+	// // import 'firebase/performance';
+	// // import 'firebase/analytics';
+
+	// import { initializeApp } from 'firebase/app';
+	// import { getFirestore } from 'firebase/firestore';
+	// import { getAuth } from 'firebase/auth';
+
+	// let firebaseConfig = {
+	// 	// Insert Firebase Credentials here
+	// 	apiKey: 'AIzaSyBKhsmYSTVL64oXto5Q8PLLO8KDvKMPg7Y',
+	// 	authDomain: 'ruumii.firebaseapp.com',
+	// 	projectId: 'ruumii',
+	// 	storageBucket: 'ruumii.appspot.com',
+	// 	messagingSenderId: '961633016174',
+	// 	appId: '1:961633016174:web:efa6dc89aca35a1674897f',
+	// 	measurementId: 'G-559GB9CGNV'
+	// };
+
+	// // Initialize Firebase
+	// const app = initializeApp(firebaseConfig);
+	// export const db = getFirestore(app);
+	// export const auth = getAuth(app);
+
+	// // firebase.initializeApp(firebaseConfig);
+
+	// import { auth, db } from './firebase.js';
+
+	import { FirebaseApp, User, Doc, Collection } from 'sveltefire';
+	import { auth, firestore } from '$lib/firebase.js';
+
+	import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+
+	const provider = new GoogleAuthProvider();
+
+	const s = () =>
+		signInWithPopup(auth, provider)
+			.then((result) => {
+				// This gives you a Google Access Token. You can use it to access the Google API.
+				const credential = GoogleAuthProvider.credentialFromResult(result);
+				const token = credential.accessToken;
+				// The signed-in user info.
+				const user = result.user;
+				// IdP data available using getAdditionalUserInfo(result)
+				// ...
+			})
+			.catch((error) => {
+				// Handle Errors here.
+				const errorCode = error.code;
+				const errorMessage = error.message;
+				// The email of the user's account used.
+				const email = error.customData.email;
+				// The AuthCredential type that was used.
+				const credential = GoogleAuthProvider.credentialFromError(error);
+				// ...
+			});
 </script>
 
-<svelte:head>
-	<title>Home</title>
-	<meta name="description" content="Svelte demo app" />
-</svelte:head>
+<main>
+	<!-- {#if !firebaseConfig.projectId}
+		<strong>Step 0</strong>
+		Create a
+		<a href="https://firebase.google.com/">Firebase Project</a>
+		and paste your web config into
+		<code>App.svelte</code>
+		.
+	{/if} -->
 
-<section>
-	<h1>
-		<span class="welcome">
-			<picture>
-				<source srcset={welcome} type="image/webp" />
-				<img src={welcome_fallback} alt="Welcome" />
-			</picture>
-		</span>
+	<!-- 1. 🔥 Firebase App -->
+	<FirebaseApp {auth} {firestore}>
+		<h1>💪🔥 Mode Activated</h1>
 
-		to your new<br />SvelteKit app
-	</h1>
+		<p>
+			<strong>Tip:</strong>
+			Open the browser console for development logging.
+		</p>
 
-	<h2>
-		try editing <strong>src/routes/+page.svelte</strong>
-	</h2>
+		<button
+			onclick={() =>
+				signInWithPopup(auth, provider)
+					.then((result) => {
+						// This gives you a Google Access Token. You can use it to access the Google API.
+						const credential = GoogleAuthProvider.credentialFromResult(result);
+						const token = credential.accessToken;
+						// The signed-in user info.
+						const user = result.user;
+						// IdP data available using getAdditionalUserInfo(result)
+						// ...
+					})
+					.catch((error) => {
+						// Handle Errors here.
+						const errorCode = error.code;
+						const errorMessage = error.message;
+						// The email of the user's account used.
+						const email = error.customData.email;
+						// The AuthCredential type that was used.
+						const credential = GoogleAuthProvider.credentialFromError(error);
+						// ...
+					})}>Sign in with Google</button
+		>
 
-	<Counter />
-</section>
+		<!-- 2. 😀 Get the current user -->
+		<User let:user>
+			Howdy 😀! User
+			<em>{user.uid}</em>
 
-<style>
-	section {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		flex: 0.6;
-	}
+			<button on:click={() => auth.signOut()}>Sign Out</button>
 
-	h1 {
-		width: 100%;
-	}
+			<div slot="signed-out">
+				<button on:click={() => auth.signInAnonymously()}> Sign In Anonymously </button>
+			</div>
 
-	.welcome {
-		display: block;
-		position: relative;
-		width: 100%;
-		height: 0;
-		padding: 0 0 calc(100% * 495 / 2048) 0;
-	}
+			<hr />
 
-	.welcome img {
-		position: absolute;
-		width: 100%;
-		height: 100%;
-		top: 0;
-		display: block;
-	}
-</style>
+			<!-- 3. 📜 Get a Firestore document owned by a user -->
+			<Doc path={`posts/${user.uid}`} let:data={post} let:ref={postRef} log>
+				<h2>{post.title}</h2>
+
+				<p>
+					Document created at <em>{new Date(post.createdAt).toLocaleString()}</em>
+				</p>
+
+				<span slot="loading">Loading post...</span>
+				<span slot="fallback">
+					<button
+						on:click={() =>
+							postRef.set({
+								title: '📜 I like Svelte',
+								createdAt: Date.now()
+							})}
+					>
+						Create Document
+					</button>
+				</span>
+
+				<!-- 4. 💬 Get all the comments in its subcollection -->
+
+				<h3>Comments</h3>
+				<Collection
+					path={postRef.collection('comments')}
+					query={(ref) => ref.orderBy('createdAt')}
+					let:data={comments}
+					let:ref={commentsRef}
+					log
+				>
+					{#if !comments.length}
+						No comments yet...
+					{/if}
+
+					{#each comments as comment}
+						<p>
+							<!-- ID: <em>{comment.ref.id}</em> -->
+						</p>
+						<p>
+							{comment.text}
+							<button on:click={() => comment.ref.delete()}>Delete</button>
+						</p>
+					{/each}
+
+					<button
+						on:click={() =>
+							commentsRef.add({
+								text: '💬 Me too!',
+								createdAt: Date.now()
+							})}
+					>
+						Add Comment
+					</button>
+
+					<span slot="loading">Loading comments...</span>
+				</Collection>
+			</Doc>
+		</User>
+	</FirebaseApp>
+</main>
